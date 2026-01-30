@@ -1,12 +1,14 @@
-import { Tabs } from "expo-router";
+import { Stack } from "expo-router";
+import { AuthProvider } from "./context/AuthContext";
 
-export default function Layout() {
+export default function RootLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: true }}>
-      <Tabs.Screen name="index" options={{ title: "Dashboard" }} />
-      <Tabs.Screen name="connection" options={{ title: "Connection" }} />
-      <Tabs.Screen name="BleScanner" options={{ title: "BLE Scan" }} />
-      <Tabs.Screen name="history" options={{ title: "History" }} />
-    </Tabs>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </AuthProvider>
   );
 }
