@@ -5,7 +5,6 @@ import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Show loading spinner while checking auth
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -14,7 +13,6 @@ export default function TabsLayout() {
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Redirect href="/login" />;
   }
@@ -36,24 +34,24 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="overview"
         options={{
-          title: "Dashboard",
+          title: "Overview",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏥</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="live-dashboard"
+        options={{
+          title: "Live Data",
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📊</Text>,
         }}
       />
       <Tabs.Screen
-        name="vehicles"
+        name="obd-connection"
         options={{
-          title: "Vehicles",
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🚗</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: "History",
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📜</Text>,
+          title: "OBD Connect",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🔌</Text>,
         }}
       />
       <Tabs.Screen

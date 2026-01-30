@@ -1,11 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ⚠️ CHANGE THIS TO YOUR BACKEND URL
-// For local development: http://YOUR_COMPUTER_IP:3000
-// For production: https://your-deployed-backend.com
-const API_BASE_URL = "http://192.168.0.100:3000/api/v1";
+const API_BASE_URL = "http://192.168.0.103:3000/api/v1";
 
-// Helper to get auth token
 const getAuthToken = async () => {
   try {
     return await AsyncStorage.getItem("authToken");
@@ -15,7 +12,6 @@ const getAuthToken = async () => {
   }
 };
 
-// Generic API request handler
 const apiRequest = async (endpoint, options = {}) => {
   const token = await getAuthToken();
 
@@ -24,7 +20,6 @@ const apiRequest = async (endpoint, options = {}) => {
     ...options.headers,
   };
 
-  // Add auth token if available
   if (token && !options.skipAuth) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -49,9 +44,8 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
-// API methods
 const api = {
-  // Auth endpoints
+  // ==================== AUTH ====================
   register: async (name, email, password) => {
     const data = await apiRequest("/users/register", {
       method: "POST",
@@ -59,13 +53,14 @@ const api = {
       skipAuth: true,
     });
 
-    // Save token
-    if (data.success && data.data.token) {
-      await AsyncStorage.setItem("authToken", data.data.token);
-      await AsyncStorage.setItem("user", JSON.stringify(data.data));
+    if (data.token) {
+      await AsyncStorage.setItem("authToken", data.token);
+    }
+    if (data.user) {
+      await AsyncStorage.setItem("user", JSON.stringify(data.user));
     }
 
-    return data;
+    return { success: true, data: data.user };
   },
 
   login: async (email, password) => {
@@ -75,13 +70,14 @@ const api = {
       skipAuth: true,
     });
 
-    // Save token
-    if (data.success && data.data.token) {
-      await AsyncStorage.setItem("authToken", data.data.token);
-      await AsyncStorage.setItem("user", JSON.stringify(data.data));
+    if (data.token) {
+      await AsyncStorage.setItem("authToken", data.token);
+    }
+    if (data.user) {
+      await AsyncStorage.setItem("user", JSON.stringify(data.user));
     }
 
-    return data;
+    return { success: true, data: data.user, token: data.token };
   },
 
   logout: async () => {
@@ -92,17 +88,17 @@ const api = {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      // Clear local storage
       await AsyncStorage.removeItem("authToken");
       await AsyncStorage.removeItem("user");
     }
   },
 
   getUserDetails: async () => {
-    return await apiRequest("/users/");
+    const data = await apiRequest("/users/");
+    return { success: true, data: data.user };
   },
 
-  // Vehicle endpoints
+  // ==================== VEHICLES ====================
   getVehicles: async () => {
     return await apiRequest("/vehicles");
   },
@@ -131,7 +127,8 @@ const api = {
     });
   },
 
-  // OBD Data endpoints
+  // ==================== OBD DATA ====================
+  // Upload OBD records (bulk)
   uploadOBDData: async (vehicleId, obdRecords) => {
     return await apiRequest(`/vehicles/${vehicleId}/obd`, {
       method: "POST",
@@ -141,52 +138,33 @@ const api = {
 
   getOBDRecords: async (vehicleId, params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return await apiRequest(`/vehicles/${vehicleId}/obd?${query}`);
+    return await apiRequest(
+      `/vehicles/${vehicleId}/obd${query ? "?" + query : ""}`,
+    );
   },
 
-  getOBDStats: async (vehicleId) => {
-    return await apiRequest(`/vehicles/${vehicleId}/obd/stats`);
-  },
-
-  // Batch endpoints
-  getBatches: async (vehicleId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await apiRequest(`/vehicles/${vehicleId}/batches?${query}`);
-  },
-
-  getBatch: async (vehicleId, batchId) => {
-    return await apiRequest(`/vehicles/${vehicleId}/batches/${batchId}`);
-  },
-
-  createBatch: async (vehicleId, batchData) => {
-    return await apiRequest(`/vehicles/${vehicleId}/batches`, {
-      method: "POST",
-      body: JSON.stringify(batchData),
+  deleteOldOBDRecords: async (vehicleId, beforeDate) => {
+    return await apiRequest(`/vehicles/${vehicleId}/obd`, {
+      method: "DELETE",
+      body: JSON.stringify({ beforeDate }),
     });
   },
 
-  // ML Reports endpoints
-  getMLReports: async (vehicleId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await apiRequest(`/vehicles/${vehicleId}/ml-reports?${query}`);
-  },
-
-  getLatestMLReport: async (vehicleId) => {
-    return await apiRequest(`/vehicles/${vehicleId}/ml-reports/latest`);
-  },
-
-  getHealthTrend: async (vehicleId) => {
-    return await apiRequest(`/vehicles/${vehicleId}/ml-reports/trend`);
-  },
-
-  // Diagnostics endpoints
+  // ==================== DIAGNOSTICS ====================
+  // Get diagnostics (ML reports from cron job)
   getDiagnostics: async (vehicleId, params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return await apiRequest(`/vehicles/${vehicleId}/diagnostics?${query}`);
+    return await apiRequest(
+      `/vehicles/${vehicleId}/diagnostics${query ? "?" + query : ""}`,
+    );
   },
 
+  // Get latest diagnostic report
   getLatestDiagnostic: async (vehicleId) => {
-    return await apiRequest(`/vehicles/${vehicleId}/diagnostics/latest`);
+    const response = await apiRequest(
+      `/vehicles/${vehicleId}/diagnostics?limit=1`,
+    );
+    return response?.data?.[0] || null;
   },
 };
 
