@@ -13,9 +13,9 @@ export default function TabsLayout() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <Redirect href="/login" />;
-  }
+  // if (!isAuthenticated) {
+  //   return <Redirect href="/login" />;
+  // }
 
   return (
     <Tabs
@@ -47,13 +47,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>📊</Text>,
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="obd-connection"
         options={{
           title: "OBD Connect",
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🔌</Text>,
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="settings"
         options={{
