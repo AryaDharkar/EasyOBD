@@ -40,7 +40,7 @@ export default function LoginScreen() {
 
       if (result.success) {
         // Navigation will be handled by the auth state change
-        router.replace("/(tabs)");
+        router.replace("/(tabs)/overview");
       } else {
         Alert.alert("Login Failed", result.message || "Invalid credentials");
       }

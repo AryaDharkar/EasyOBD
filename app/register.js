@@ -52,7 +52,10 @@ export default function RegisterScreen() {
 
       if (result.success) {
         Alert.alert("Success", "Account created successfully!", [
-          { text: "OK", onPress: () => router.replace("/(tabs)") },
+          {
+            text: "OK",
+            onPress: () => router.replace("/device-setup")
+          },
         ]);
       } else {
         Alert.alert(

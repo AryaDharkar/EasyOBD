@@ -100,6 +100,11 @@ export default function HealthDetailScreen() {
       {/* Reports List */}
       {reports.map((report, index) => (
         <View key={report._id} style={styles.reportCard}>
+          {(() => {
+            const healthScore = report.aiSnapshot?.healthScore ?? report.aiSnapshot?.confidenceScore ?? 0;
+            const confidenceScore = report.aiSnapshot?.confidenceScore ?? 0;
+            return (
+              <>
           {/* Time Window */}
           <View style={styles.reportHeader}>
             <View style={styles.timeChip}>
@@ -108,21 +113,32 @@ export default function HealthDetailScreen() {
                 {formatDate(report.timeWindow.end)}
               </Text>
             </View>
-            <View
-              style={[
-                styles.confidenceBadge,
-                {
-                  backgroundColor: getConfidenceColor(
-                    report.aiSnapshot?.confidenceScore,
-                  ),
-                },
-              ]}
-            >
-              <Text style={styles.confidenceText}>
-                {report.aiSnapshot?.confidenceScore}% confidence
-              </Text>
+            <View style={styles.badgesRow}>
+              <View
+                style={[
+                  styles.healthBadge,
+                  {
+                    backgroundColor: getConfidenceColor(healthScore),
+                  },
+                ]}
+              >
+                <Text style={styles.confidenceText}>{healthScore}% health</Text>
+              </View>
+              <View
+                style={[
+                  styles.confidenceBadge,
+                  {
+                    backgroundColor: getConfidenceColor(confidenceScore),
+                  },
+                ]}
+              >
+                <Text style={styles.confidenceText}>{confidenceScore}% confidence</Text>
+              </View>
             </View>
           </View>
+              </>
+            );
+          })()}
 
           {/* Likely Issue */}
           {report.aiSnapshot?.likely_issue && (
@@ -269,6 +285,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     alignSelf: "flex-start",
+  },
+  healthBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: "flex-start",
+    marginRight: 8,
+  },
+  badgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   confidenceText: {
     fontSize: 12,

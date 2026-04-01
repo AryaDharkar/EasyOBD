@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ⚠️ CHANGE THIS TO YOUR BACKEND URL
-const API_BASE_URL = "http://192.168.0.103:3000/api/v1";
+const API_BASE_URL = "http://192.168.0.61:3000/api/v1";
 
 const getAuthToken = async () => {
   try {
@@ -151,7 +151,7 @@ const api = {
   },
 
   // ==================== DIAGNOSTICS ====================
-  // Get diagnostics (ML reports from cron job)
+  // Get diagnostics (ML reports)
   getDiagnostics: async (vehicleId, params = {}) => {
     const query = new URLSearchParams(params).toString();
     return await apiRequest(
@@ -165,6 +165,40 @@ const api = {
       `/vehicles/${vehicleId}/diagnostics?limit=1`,
     );
     return response?.data?.[0] || null;
+  },
+
+  // Get data collection progress
+  getCollectionProgress: async (vehicleId) => {
+    return await apiRequest(`/vehicles/${vehicleId}/diagnostics/progress`);
+  },
+
+  // Manually trigger report generation
+  generateReport: async (vehicleId, espAnomalyFlag = false, seedCsv = "") => {
+    return await apiRequest(`/vehicles/${vehicleId}/diagnostics/generate`, {
+      method: "POST",
+      body: JSON.stringify({
+        espAnomalyFlag: espAnomalyFlag,
+        seedCsv,
+      })
+    });
+  },
+
+  // ==================== BASELINE MODEL ====================
+  // Get baseline model for ESP32
+  getBaselineModel: async (vehicleId) => {
+    return await apiRequest(`/vehicles/${vehicleId}/baseline`);
+  },
+
+  // Get model chunk for BLE transfer
+  getModelChunk: async (vehicleId, chunkIndex) => {
+    return await apiRequest(`/vehicles/${vehicleId}/baseline/chunk/${chunkIndex}`);
+  },
+
+  // Mark model as deployed to ESP
+  markModelDeployed: async (vehicleId, modelId) => {
+    return await apiRequest(`/vehicles/${vehicleId}/baseline/${modelId}/deployed`, {
+      method: "POST"
+    });
   },
 };
 
