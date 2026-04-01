@@ -6,13 +6,72 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Switch,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { isDark, toggleTheme, colors } = useTheme();
+  const styles = createStyles(colors);
+
+  const sections = [
+    {
+      title: "Account",
+      items: [
+        {
+          key: "edit-profile",
+          icon: "account-outline",
+          label: "Edit Profile",
+          description: "Update your information",
+        },
+        {
+          key: "notifications",
+          icon: "bell-outline",
+          label: "Notifications",
+          description: "Manage alerts",
+        },
+      ],
+    },
+    {
+      title: "Preferences",
+      items: [
+        {
+          key: "units",
+          icon: "ruler",
+          label: "Units",
+          description: "km/h, C",
+        },
+      ],
+    },
+    {
+      title: "About",
+      items: [
+        {
+          key: "about",
+          icon: "information-outline",
+          label: "About EasyOBD",
+          description: "Version 1.0.0",
+        },
+        {
+          key: "privacy",
+          icon: "file-document-outline",
+          label: "Privacy Policy",
+          description: "How we handle your data",
+        },
+        {
+          key: "support",
+          icon: "lifebuoy",
+          label: "Support",
+          description: "Get help",
+        },
+      ],
+    },
+  ];
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -29,8 +88,21 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleComingSoon = (label) => {
+    Alert.alert("Coming Soon", `${label} will be available in an upcoming update.`);
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Settings</Text>
+        <Text style={styles.pageSubtitle}>Tune your telemetry experience</Text>
+      </View>
+
       {/* User Profile Section */}
       <View style={styles.profileSection}>
         <View style={styles.avatar}>
@@ -44,79 +116,60 @@ export default function SettingsScreen() {
 
       {/* Settings Options */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>👤</Text>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionText}>Edit Profile</Text>
-            <Text style={styles.optionSubtext}>Update your information</Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>🔔</Text>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionText}>Notifications</Text>
-            <Text style={styles.optionSubtext}>Manage alerts</Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>📏</Text>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionText}>Units</Text>
-            <Text style={styles.optionSubtext}>km/h, °C</Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>🌙</Text>
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <View style={[styles.option, styles.optionLast]}>
+          <MaterialCommunityIcons
+            name="theme-light-dark"
+            size={22}
+            color={colors.accent}
+            style={styles.optionIcon}
+          />
           <View style={styles.optionContent}>
             <Text style={styles.optionText}>Theme</Text>
-            <Text style={styles.optionSubtext}>Light mode</Text>
+            <Text style={styles.optionSubtext}>{isDark ? "Dark mode" : "Light mode"}</Text>
           </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={isDark ? colors.surface : colors.text}
+          />
+        </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
+      {sections.map((section) => (
+        <View key={section.title} style={styles.section}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
 
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>ℹ️</Text>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionText}>About EasyOBD</Text>
-            <Text style={styles.optionSubtext}>Version 1.0.0</Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>📄</Text>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionText}>Privacy Policy</Text>
-            <Text style={styles.optionSubtext}>How we handle your data</Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.option}>
-          <Text style={styles.optionIcon}>📧</Text>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionText}>Support</Text>
-            <Text style={styles.optionSubtext}>Get help</Text>
-          </View>
-          <Text style={styles.optionArrow}>›</Text>
-        </TouchableOpacity>
-      </View>
+          {section.items.map((item, index) => {
+            const isLast = index === section.items.length - 1;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.option, isLast && styles.optionLast]}
+                activeOpacity={0.85}
+                onPress={() => handleComingSoon(item.label)}
+              >
+                <MaterialCommunityIcons
+                  name={item.icon}
+                  size={22}
+                  color={colors.accent}
+                  style={styles.optionIcon}
+                />
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionText}>{item.label}</Text>
+                  <Text style={styles.optionSubtext}>{item.description}</Text>
+                </View>
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={22}
+                  color={colors.accent}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -124,29 +177,55 @@ export default function SettingsScreen() {
       </TouchableOpacity>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Made with ❤️ for vehicle owners</Text>
+        <Text style={styles.footerText}>Built for high-performance vehicle owners</Text>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
+  },
+  contentContainer: {
+    paddingBottom: 30,
+  },
+  pageHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  pageSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.muted,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   profileSection: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     alignItems: "center",
-    paddingVertical: 40,
+    paddingVertical: 28,
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: colors.border,
   },
   avatar: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: "#1E40AF",
+    borderRadius: 0,
+    backgroundColor: colors.accent,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
@@ -154,34 +233,34 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#fff",
+    color: colors.surface,
   },
   userName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: "#666",
+    color: colors.muted,
   },
   section: {
-    backgroundColor: "#fff",
-    marginTop: 20,
+    backgroundColor: colors.surface,
+    marginTop: 16,
+    marginHorizontal: 16,
     paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#e0e0e0",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
+    fontWeight: "700",
+    color: colors.muted,
     paddingHorizontal: 20,
     paddingVertical: 12,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   option: {
     flexDirection: "row",
@@ -189,10 +268,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.border,
+  },
+  optionLast: {
+    borderBottomWidth: 0,
   },
   optionIcon: {
-    fontSize: 24,
+    width: 26,
     marginRight: 16,
   },
   optionContent: {
@@ -201,25 +283,20 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
+    color: colors.text,
     marginBottom: 2,
   },
   optionSubtext: {
     fontSize: 13,
-    color: "#999",
-  },
-  optionArrow: {
-    fontSize: 24,
-    color: "#ccc",
-    fontWeight: "300",
+    color: colors.muted,
   },
   logoutButton: {
-    backgroundColor: "#fff",
-    marginHorizontal: 20,
-    marginTop: 30,
+    backgroundColor: colors.surface,
+    marginHorizontal: 16,
+    marginTop: 22,
     marginBottom: 20,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#EF4444",
@@ -230,11 +307,14 @@ const styles = StyleSheet.create({
     color: "#EF4444",
   },
   footer: {
-    paddingVertical: 30,
+    paddingVertical: 10,
     alignItems: "center",
   },
   footerText: {
     fontSize: 12,
-    color: "#999",
+    color: colors.muted,
+    letterSpacing: 0.4,
   },
 });
+
+

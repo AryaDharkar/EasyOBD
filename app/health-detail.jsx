@@ -9,13 +9,36 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import api from "./services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from "./context/ThemeContext";
 
 export default function HealthDetailScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  const averageHealth = reports.length
+    ? Math.round(
+        reports.reduce(
+          (sum, report) =>
+            sum + (report.aiSnapshot?.healthScore ?? report.aiSnapshot?.confidenceScore ?? 0),
+          0,
+        ) / reports.length,
+      )
+    : 0;
+
+  const averageConfidence = reports.length
+    ? Math.round(
+        reports.reduce(
+          (sum, report) => sum + (report.aiSnapshot?.confidenceScore ?? 0),
+          0,
+        ) / reports.length,
+      )
+    : 0;
 
   useEffect(() => {
     loadReports();
@@ -57,10 +80,16 @@ export default function HealthDetailScreen() {
     return "#EF4444";
   };
 
+  const getSeverityAccent = (score) => {
+    if (score >= 75) return "#2F7A4F";
+    if (score >= 50) return "#8A6A1F";
+    return "#8B3A3A";
+  };
+
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#1E40AF" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>Loading detailed reports...</Text>
       </View>
     );
@@ -69,7 +98,7 @@ export default function HealthDetailScreen() {
   if (reports.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📊</Text>
+        <MaterialCommunityIcons name="chart-box-outline" size={72} color={colors.accent} style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>No Reports Yet</Text>
         <Text style={styles.emptyText}>
           Upload OBD data to generate health reports
@@ -94,11 +123,29 @@ export default function HealthDetailScreen() {
         >
           <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Full Health Report</Text>
+        <View>
+          <Text style={styles.headerTitle}>Reports</Text>
+          <Text style={styles.headerSubtitle}>Latest health and confidence windows</Text>
+        </View>
+      </View>
+
+      <View style={styles.summaryStrip}>
+        <View style={styles.summaryTile}>
+          <Text style={styles.summaryTileLabel}>Entries</Text>
+          <Text style={styles.summaryTileValue}>{reports.length}</Text>
+        </View>
+        <View style={styles.summaryTile}>
+          <Text style={styles.summaryTileLabel}>Avg Health</Text>
+          <Text style={styles.summaryTileValue}>{averageHealth}%</Text>
+        </View>
+        <View style={styles.summaryTile}>
+          <Text style={styles.summaryTileLabel}>Avg Confidence</Text>
+          <Text style={styles.summaryTileValue}>{averageConfidence}%</Text>
+        </View>
       </View>
 
       {/* Reports List */}
-      {reports.map((report, index) => (
+      {reports.map((report) => (
         <View key={report._id} style={styles.reportCard}>
           {(() => {
             const healthScore = report.aiSnapshot?.healthScore ?? report.aiSnapshot?.confidenceScore ?? 0;
@@ -120,6 +167,18 @@ export default function HealthDetailScreen() {
                   {
                     backgroundColor: getConfidenceColor(healthScore),
                   },
+                  <View
+                    style={[
+                      styles.severityPill,
+                      {
+                        borderColor: getSeverityAccent(healthScore),
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.severityText, { color: getSeverityAccent(healthScore) }]}>
+                      {healthScore >= 75 ? "STABLE" : healthScore >= 50 ? "WATCH" : "CRITICAL"}
+                    </Text>
+                  </View>
                 ]}
               >
                 <Text style={styles.confidenceText}>{healthScore}% health</Text>
@@ -143,7 +202,7 @@ export default function HealthDetailScreen() {
           {/* Likely Issue */}
           {report.aiSnapshot?.likely_issue && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🔍 Detected Issue</Text>
+              <Text style={styles.sectionTitle}>Detected Issue</Text>
               <Text style={styles.issueText}>
                 {report.aiSnapshot.likely_issue}
               </Text>
@@ -154,7 +213,7 @@ export default function HealthDetailScreen() {
           {report.aiSnapshot?.affected_parts &&
             report.aiSnapshot.affected_parts.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>⚙️ Affected Parts</Text>
+                <Text style={styles.sectionTitle}>Affected Parts</Text>
                 <View style={styles.partsList}>
                   {report.aiSnapshot.affected_parts.map((part, idx) => (
                     <View key={idx} style={styles.partChip}>
@@ -168,7 +227,7 @@ export default function HealthDetailScreen() {
           {/* AI Summary */}
           {report.aiSnapshot?.summary && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>📝 AI Analysis</Text>
+              <Text style={styles.sectionTitle}>AI Analysis</Text>
               <Text style={styles.summaryText}>
                 {report.aiSnapshot.summary}
               </Text>
@@ -192,29 +251,29 @@ export default function HealthDetailScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          💡 Reports are automatically generated by AI every minute
+          Reports are generated by the hybrid baseline + AI pipeline
         </Text>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
     padding: 20,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
   },
   emptyIcon: {
     fontSize: 80,
@@ -223,12 +282,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
     marginBottom: 12,
   },
   emptyText: {
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
     textAlign: "center",
     marginBottom: 24,
   },
@@ -236,9 +295,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: colors.border,
   },
   backButtonSmall: {
     padding: 8,
@@ -246,74 +305,126 @@ const styles = StyleSheet.create({
   },
   backArrow: {
     fontSize: 24,
-    color: "#1E40AF",
+    color: colors.accent,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.text,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  summaryStrip: {
+    flexDirection: "row",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 2,
+  },
+  summaryTile: {
+    flex: 1,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  summaryTileLabel: {
+    fontSize: 10,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  summaryTileValue: {
+    marginTop: 3,
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
   },
   reportCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     margin: 16,
     padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   reportHeader: {
     marginBottom: 16,
   },
   timeChip: {
-    backgroundColor: "#E0E7FF",
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 0,
     alignSelf: "flex-start",
     marginBottom: 8,
   },
   timeText: {
     fontSize: 12,
-    color: "#3730A3",
+    color: colors.muted,
     fontWeight: "600",
   },
   confidenceBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 0,
     alignSelf: "flex-start",
   },
   healthBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 0,
     alignSelf: "flex-start",
     marginRight: 8,
   },
   badgesRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
   },
   confidenceText: {
     fontSize: 12,
-    color: "#fff",
+    color: colors.onAccent,
     fontWeight: "bold",
+  },
+  severityPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 0,
+    alignSelf: "flex-start",
+    backgroundColor: colors.panel,
+  },
+  severityText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   section: {
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
+    fontWeight: "700",
+    color: colors.text,
     marginBottom: 8,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   issueText: {
     fontSize: 14,
-    color: "#EF4444",
+    color: "#FCA5A5",
     lineHeight: 20,
     fontWeight: "500",
   },
@@ -322,21 +433,23 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   partChip: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.chipBg,
+    borderWidth: 1,
+    borderColor: colors.chipBorder,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 0,
     marginRight: 8,
     marginBottom: 8,
   },
   partText: {
     fontSize: 13,
-    color: "#92400E",
+    color: colors.chipText,
     fontWeight: "500",
   },
   summaryText: {
     fontSize: 14,
-    color: "#555",
+    color: colors.text,
     lineHeight: 22,
   },
   metaSection: {
@@ -344,33 +457,33 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    borderTopColor: colors.border,
     marginTop: 12,
   },
   metaLabel: {
     fontSize: 13,
-    color: "#666",
+    color: colors.muted,
   },
   metaValue: {
     fontSize: 13,
-    color: "#333",
+    color: colors.text,
     fontWeight: "600",
   },
   timestamp: {
     fontSize: 11,
-    color: "#999",
+    color: colors.muted,
     marginTop: 8,
     textAlign: "right",
   },
   backButton: {
-    backgroundColor: "#1E40AF",
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 0,
     marginTop: 16,
   },
   backButtonText: {
-    color: "#fff",
+    color: colors.onAccent,
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -380,8 +493,10 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
-    color: "#666",
+    color: colors.muted,
     textAlign: "center",
-    fontStyle: "italic",
+    letterSpacing: 0.3,
   },
 });
+
+

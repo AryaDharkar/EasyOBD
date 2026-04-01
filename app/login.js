@@ -13,12 +13,15 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "./context/AuthContext";
+import { useTheme } from "./context/ThemeContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -62,9 +65,9 @@ export default function LoginScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.logo}>🚗</Text>
+          <Text style={styles.logo}>EOBD</Text>
           <Text style={styles.title}>EasyOBD</Text>
-          <Text style={styles.subtitle}>Monitor your vehicle's health</Text>
+          <Text style={styles.subtitle}>Portable vehicle telemetry and diagnostics</Text>
         </View>
 
         {/* Form */}
@@ -74,7 +77,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="your.email@example.com"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.inputPlaceholder}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -89,7 +92,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.inputPlaceholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -104,7 +107,7 @@ export default function LoginScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.surface} />
             ) : (
               <Text style={styles.buttonText}>Login</Text>
             )}
@@ -126,10 +129,11 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -141,18 +145,25 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logo: {
-    fontSize: 60,
+    fontSize: 42,
+    letterSpacing: 4,
+    fontWeight: "800",
+    color: colors.text,
     marginBottom: 10,
   },
   title: {
     fontSize: 32,
-    fontWeight: "bold",
-    color: "#1E40AF",
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: colors.accent,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: 14,
+    letterSpacing: 0.4,
+    color: colors.muted,
+    textAlign: "center",
   },
   form: {
     width: "100%",
@@ -162,26 +173,28 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    color: colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 0,
     padding: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    color: "#333",
+    borderColor: colors.border,
+    color: colors.text,
   },
   button: {
-    backgroundColor: "#1E40AF",
-    borderRadius: 12,
+    backgroundColor: colors.accent,
+    borderRadius: 0,
     padding: 16,
     alignItems: "center",
     marginTop: 10,
-    shadowColor: "#1E40AF",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -193,7 +206,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   buttonText: {
-    color: "#fff",
+    color: colors.onAccent,
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -204,11 +217,13 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: "#666",
+    color: colors.muted,
   },
   linkText: {
     fontSize: 14,
-    color: "#1E40AF",
+    color: colors.accent,
     fontWeight: "600",
   },
 });
+
+

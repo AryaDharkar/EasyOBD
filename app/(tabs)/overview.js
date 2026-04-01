@@ -13,14 +13,18 @@ import {
   Platform,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import api from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   getHardcodedSeedCsv,
   getHardcodedSeedCsvRecordCount,
 } from "../data/obdSeedCsv";
+import { useTheme } from "../context/ThemeContext";
 
 export default function OverviewScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [latestReport, setLatestReport] = useState(null);
   const [progress, setProgress] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -193,22 +197,34 @@ export default function OverviewScreen() {
 
   const getHealthScoreColor = (score) => {
     if (!score) return "#9CA3AF";
-    if (score >= 75) return "#10B981";
-    if (score >= 50) return "#F59E0B";
+    if (score >= 80) return "#10B981";
+    if (score >= 65) return "#22C55E";
+    if (score >= 45) return "#F59E0B";
     return "#EF4444";
   };
 
   const getHealthScoreLabel = (score) => {
     if (!score) return "Unknown";
-    if (score >= 75) return "Excellent";
-    if (score >= 50) return "Fair";
+    if (score >= 80) return "Excellent";
+    if (score >= 65) return "Good";
+    if (score >= 45) return "Fair";
     return "Poor";
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#1E40AF" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>Loading health data...</Text>
       </View>
     );
@@ -217,7 +233,7 @@ export default function OverviewScreen() {
   if (!isBleConnected) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>🚗</Text>
+        <MaterialCommunityIcons name="car-connected" size={72} color={colors.accent} style={styles.emptyIcon} />
         <Text style={styles.emptyTitle}>No Vehicle Found</Text>
         <Text style={styles.emptyText}>
           Connect an OBD BLE device from the Live Data tab to continue.
@@ -236,9 +252,10 @@ export default function OverviewScreen() {
         }
       >
         <View style={styles.collectingDataContainer}>
-          <Text style={styles.collectingIcon}>📊</Text>
+          <Text style={styles.pageTitle}>Overview</Text>
+          <Text style={styles.pageSubtitle}>Connected: {bleDeviceName || "OBD Device"}</Text>
+          <MaterialCommunityIcons name="database-sync" size={72} color={colors.accent} style={styles.collectingIcon} />
           <Text style={styles.collectingTitle}>Collecting Data</Text>
-          <Text style={styles.connectedDeviceText}>Connected: {bleDeviceName}</Text>
           <Text style={styles.collectingText}>
             Please drive and let the OBD module collect more data for accurate
             diagnosis.
@@ -254,11 +271,11 @@ export default function OverviewScreen() {
           >
             {isGenerating ? (
               <>
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.onAccent} />
                 <Text style={styles.generateButtonText}>Generating...</Text>
               </>
             ) : (
-              <Text style={styles.generateButtonText}>🔄 Generate New Report</Text>
+              <Text style={styles.generateButtonText}>Generate New Report</Text>
             )}
           </TouchableOpacity>
 
@@ -275,13 +292,13 @@ export default function OverviewScreen() {
               <ProgressViewIOS
                 style={styles.progressBar}
                 progress={displayProgressPercent / 100}
-                progressTintColor="#1E40AF"
+                progressTintColor={colors.accent}
               />
             ) : (
               <ProgressBarAndroid
                 style={styles.progressBar}
                 progress={displayProgressPercent / 100}
-                color="#1E40AF"
+                color={colors.accent}
               />
             )}
 
@@ -326,26 +343,10 @@ export default function OverviewScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Generate Report Button */}
-      <TouchableOpacity
-        style={[
-          styles.generateButton,
-          (isGenerating || !isBleConnected) && styles.generateButtonDisabled,
-        ]}
-        onPress={handleGenerateReport}
-        disabled={isGenerating || !isBleConnected}
-      >
-        {isGenerating ? (
-          <>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.generateButtonText}>Generating...</Text>
-          </>
-        ) : (
-          <Text style={styles.generateButtonText}>
-            🔄 Generate New Report
-          </Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.reportHeaderBlock}>
+        <Text style={styles.pageTitle}>Overview</Text>
+        <Text style={styles.pageSubtitle}>{bleDeviceName || "OBD Device"}</Text>
+      </View>
 
       {latestReport && (
         <>
@@ -384,6 +385,7 @@ export default function OverviewScreen() {
             <Text style={styles.confidenceSubtext}>
               Report confidence: {confidenceScore}%
             </Text>
+            <Text style={styles.healthUpdatedText}>Updated {formatTime(latestReport.createdAt)}</Text>
           </View>
               </>
             );
@@ -393,7 +395,7 @@ export default function OverviewScreen() {
           {latestReport.aiSnapshot?.likely_issue && (
             <View style={styles.issueCard}>
               <View style={styles.issueHeader}>
-                <Text style={styles.issueIcon}>⚠️</Text>
+                <MaterialCommunityIcons name="alert-circle-outline" size={22} color="#C08700" style={styles.issueIcon} />
                 <Text style={styles.issueTitle}>Latest Analysis</Text>
               </View>
               <Text style={styles.issueText}>
@@ -401,6 +403,28 @@ export default function OverviewScreen() {
               </Text>
             </View>
           )}
+
+          {/* Generate Report Button */}
+          <TouchableOpacity
+            style={[
+              styles.generateButton,
+              (isGenerating || !isBleConnected) && styles.generateButtonDisabled,
+            ]}
+            onPress={handleGenerateReport}
+            disabled={isGenerating || !isBleConnected}
+          >
+            {isGenerating ? (
+              <>
+                <ActivityIndicator color={colors.onAccent} />
+                <Text style={styles.generateButtonText}>Generating...</Text>
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="file-chart-outline" size={18} color={colors.onAccent} />
+                <Text style={styles.generateButtonText}>Generate New Report</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           {/* Affected Parts */}
           {latestReport.aiSnapshot?.affected_parts &&
@@ -445,7 +469,7 @@ export default function OverviewScreen() {
 
       {!latestReport && progress?.canGenerate && (
         <View style={styles.noReportCard}>
-          <Text style={styles.noReportIcon}>📋</Text>
+          <MaterialCommunityIcons name="file-document-outline" size={56} color={colors.accent} style={styles.noReportIcon} />
           <Text style={styles.noReportTitle}>No Reports Yet</Text>
           <Text style={styles.noReportText}>
             Tap the button above to generate your first health report!
@@ -456,98 +480,124 @@ export default function OverviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
+  },
+  reportHeaderBlock: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  pageSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.muted,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
     padding: 20,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
   },
   connectedDeviceText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1E40AF",
+    color: colors.accent,
     marginBottom: 10,
   },
   collectingDataContainer: {
     flex: 1,
     alignItems: "center",
     padding: 20,
-    marginTop: 40,
+    marginTop: 8,
   },
   collectingIcon: {
     fontSize: 80,
     marginBottom: 16,
   },
   collectingTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    color: colors.text,
     marginBottom: 12,
+    textTransform: "uppercase",
   },
   collectingText: {
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
     textAlign: "center",
     marginBottom: 32,
     lineHeight: 24,
   },
   progressSection: {
     width: "100%",
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 0,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   progressInfo: {
     marginBottom: 12,
   },
   progressLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: colors.muted,
     marginBottom: 4,
   },
   progressNumbers: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1E40AF",
+    color: colors.accent,
   },
   progressBar: {
     height: 8,
     marginVertical: 12,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   progressMessage: {
     fontSize: 14,
-    color: "#666",
+    color: colors.muted,
     textAlign: "center",
     marginTop: 12,
-    fontStyle: "italic",
   },
   instructionsCard: {
     width: "100%",
-    backgroundColor: "#E0E7FF",
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#1E40AF",
+    backgroundColor: colors.surface,
+    padding: 18,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   instructionsTitle: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#1E40AF",
-    marginBottom: 12,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: colors.accent,
+    marginBottom: 14,
   },
   instructionStep: {
     flexDirection: "row",
@@ -557,33 +607,33 @@ const styles = StyleSheet.create({
   stepNumber: {
     width: 28,
     height: 28,
-    borderRadius: 14,
-    backgroundColor: "#1E40AF",
-    color: "#fff",
+    borderRadius: 0,
+    backgroundColor: colors.accent,
+    color: colors.onAccent,
     textAlign: "center",
     lineHeight: 28,
-    fontWeight: "bold",
+    fontWeight: "800",
     marginRight: 12,
   },
   stepText: {
     flex: 1,
     fontSize: 14,
-    color: "#333",
+    color: colors.text,
     lineHeight: 20,
   },
   generateButton: {
-    backgroundColor: "#10B981",
+    backgroundColor: colors.accent,
     margin: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    shadowColor: "#10B981",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
   },
   generateButtonDisabled: {
     backgroundColor: "#9CA3AF",
@@ -591,23 +641,32 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   generateButtonText: {
-    color: "#fff",
+    color: colors.onAccent,
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "800",
     marginLeft: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  healthUpdatedText: {
+    marginTop: 8,
+    fontSize: 11,
+    color: colors.muted,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
   },
   emptyReportCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     margin: 16,
     padding: 32,
-    borderRadius: 16,
+    borderRadius: 0,
     alignItems: "center",
   },
   noReportCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     margin: 16,
     padding: 32,
-    borderRadius: 16,
+    borderRadius: 0,
     alignItems: "center",
   },
   noReportIcon: {
@@ -617,20 +676,20 @@ const styles = StyleSheet.create({
   noReportTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
     marginBottom: 8,
   },
   noReportText: {
     fontSize: 14,
-    color: "#666",
+    color: colors.muted,
     textAlign: "center",
     lineHeight: 20,
   },
   healthScoreCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     margin: 16,
     padding: 24,
-    borderRadius: 16,
+    borderRadius: 0,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -640,8 +699,10 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    color: colors.text,
     marginBottom: 16,
   },
   scoreCircle: {
@@ -654,29 +715,29 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     fontSize: 18,
-    color: "#666",
+    color: colors.muted,
     marginTop: 8,
   },
   confidenceSubtext: {
     marginTop: 10,
     fontSize: 13,
-    color: "#6B7280",
+    color: colors.muted,
     fontWeight: "600",
   },
   healthBar: {
     height: 8,
-    borderRadius: 4,
+    borderRadius: 0,
     marginTop: 16,
     alignSelf: "stretch",
   },
   issueCard: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: colors.warningSurface,
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     borderLeftWidth: 4,
-    borderLeftColor: "#F59E0B",
+    borderLeftColor: colors.warningBorder,
   },
   issueHeader: {
     flexDirection: "row",
@@ -689,20 +750,20 @@ const styles = StyleSheet.create({
   },
   issueTitle: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#92400E",
+    fontWeight: "800",
+    color: colors.warningText,
   },
   issueText: {
     fontSize: 14,
-    color: "#78350F",
+    color: colors.warningBody,
     lineHeight: 20,
   },
   partsCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -715,24 +776,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   partChip: {
-    backgroundColor: "#E0E7FF",
+    backgroundColor: colors.chipBg,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 0,
     marginRight: 8,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.chipBorder,
   },
   partText: {
     fontSize: 13,
-    color: "#3730A3",
-    fontWeight: "500",
+    color: colors.chipText,
+    fontWeight: "600",
   },
   summaryCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -741,30 +804,30 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 14,
-    color: "#555",
+    color: colors.text,
     lineHeight: 22,
   },
   fullReportButton: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#1E40AF",
+    borderColor: colors.accent,
   },
   fullReportText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1E40AF",
+    color: colors.accent,
   },
   arrow: {
     fontSize: 20,
-    color: "#1E40AF",
+    color: colors.accent,
   },
   emptyIcon: {
     fontSize: 80,
@@ -773,23 +836,25 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
     marginBottom: 12,
     textAlign: "center",
   },
   emptyText: {
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 24,
   },
   timestamp: {
     fontSize: 11,
-    color: "#999",
+    color: colors.muted,
     marginHorizontal: 16,
     marginBottom: 32,
     textAlign: "right",
+    letterSpacing: 0.4,
   },
 });
   
+

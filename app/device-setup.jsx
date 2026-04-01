@@ -13,9 +13,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import elm from "./services/elm327";
+import { useTheme } from "./context/ThemeContext";
 
 export default function DeviceSetupScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [devices, setDevices] = useState([]);
   const [scanning, setScanning] = useState(false);
   const [connectingId, setConnectingId] = useState(null);
@@ -143,7 +147,7 @@ export default function DeviceSetupScreen() {
 
       setStep("success");
       Alert.alert(
-        "Success! ✅",
+        "Success",
         `Connected to ${device.name || device.localName || device.id}`
       );
 
@@ -164,7 +168,7 @@ export default function DeviceSetupScreen() {
     return (
       <ScrollView style={styles.container}>
         <View style={styles.introContent}>
-          <Text style={styles.introIcon}>🔌</Text>
+          <MaterialCommunityIcons name="car-wireless" size={80} color={colors.accent} style={styles.introIcon} />
           <Text style={styles.introTitle}>Connect OBD Module</Text>
           <Text style={styles.introSubtitle}>
             Set up your vehicle diagnostic device
@@ -196,7 +200,7 @@ export default function DeviceSetupScreen() {
             style={styles.primaryButton}
             onPress={startScan}
           >
-            <Text style={styles.primaryButtonText}>🔍 Find OBD Device</Text>
+            <Text style={styles.primaryButtonText}>Find OBD Device</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -217,7 +221,7 @@ export default function DeviceSetupScreen() {
           <Text style={styles.scanTitle}>
             {scanning ? "Scanning for devices..." : "Available Devices"}
           </Text>
-          {scanning && <ActivityIndicator color="#1E40AF" />}
+          {scanning && <ActivityIndicator color={colors.accent} />}
         </View>
 
         <FlatList
@@ -229,7 +233,7 @@ export default function DeviceSetupScreen() {
               onPress={() => handleDeviceSelect(item)}
             >
               <View style={styles.deviceInfo}>
-                <Text style={styles.deviceName}>🔌 {item.name}</Text>
+                <Text style={styles.deviceName}>{item.name}</Text>
                 <Text style={styles.deviceId}>{item.id}</Text>
                 {item.rssi && <Text style={styles.rssi}>Signal: {item.rssi}%</Text>}
               </View>
@@ -239,12 +243,12 @@ export default function DeviceSetupScreen() {
           ListEmptyComponent={
             scanning ? (
               <View style={styles.emptyState}>
-                <ActivityIndicator color="#1E40AF" size="large" />
+                <ActivityIndicator color={colors.accent} size="large" />
                 <Text style={styles.emptyText}>Scanning for OBD devices...</Text>
               </View>
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>🔍</Text>
+                <MaterialCommunityIcons name="radar" size={60} color={colors.accent} style={styles.emptyIcon} />
                 <Text style={styles.emptyText}>No devices found</Text>
                 <TouchableOpacity
                   style={styles.rescanButton}
@@ -271,7 +275,7 @@ export default function DeviceSetupScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#1E40AF" style={{ marginBottom: 20 }} />
+          <ActivityIndicator size="large" color={colors.accent} style={{ marginBottom: 20 }} />
           <Text style={styles.connectingTitle}>Connecting...</Text>
           <Text style={styles.connectingText}>
             {selectedDevice?.name}
@@ -285,7 +289,7 @@ export default function DeviceSetupScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.centerContent}>
-          <Text style={styles.successIcon}>✅</Text>
+          <MaterialCommunityIcons name="check-decagram" size={80} color="#10B981" style={styles.successIcon} />
           <Text style={styles.successTitle}>Device Connected!</Text>
           <Text style={styles.successText}>
             {selectedDevice?.name}
@@ -301,10 +305,10 @@ export default function DeviceSetupScreen() {
   return null;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f4f8",
+    backgroundColor: colors.background,
   },
   introContent: {
     padding: 20,
@@ -317,24 +321,28 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   introTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#1E40AF",
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: colors.accent,
     marginBottom: 8,
     textAlign: "center",
   },
   introSubtitle: {
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
     marginBottom: 32,
     textAlign: "center",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 0,
     marginBottom: 32,
     width: "100%",
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -343,8 +351,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    color: colors.text,
     marginBottom: 12,
   },
   benefit: {
@@ -361,47 +371,47 @@ const styles = StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: 14,
-    color: "#555",
+    color: colors.text,
     lineHeight: 20,
   },
   primaryButton: {
-    backgroundColor: "#1E40AF",
+    backgroundColor: colors.accent,
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 12,
+    borderRadius: 0,
     width: "100%",
     alignItems: "center",
     marginBottom: 12,
-    shadowColor: "#1E40AF",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   primaryButtonText: {
-    color: "#fff",
+    color: colors.onAccent,
     fontSize: 16,
     fontWeight: "bold",
   },
   secondaryButton: {
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 12,
+    borderRadius: 0,
     width: "100%",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#1E40AF",
+    borderColor: colors.accent,
   },
   secondaryButtonText: {
-    color: "#1E40AF",
+    color: colors.accent,
     fontSize: 16,
     fontWeight: "bold",
   },
   scanHeader: {
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: colors.border,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -409,19 +419,19 @@ const styles = StyleSheet.create({
   scanTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
   },
   deviceItem: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     marginHorizontal: 12,
     marginVertical: 6,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: colors.border,
   },
   deviceInfo: {
     flex: 1,
@@ -429,22 +439,22 @@ const styles = StyleSheet.create({
   deviceName: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
     marginBottom: 4,
   },
   deviceId: {
     fontSize: 12,
-    color: "#999",
+    color: colors.muted,
     marginBottom: 4,
   },
   rssi: {
     fontSize: 12,
-    color: "#1E40AF",
+    color: colors.accent,
     fontWeight: "500",
   },
   arrow: {
     fontSize: 24,
-    color: "#ccc",
+    color: colors.accent,
   },
   emptyState: {
     flex: 1,
@@ -458,31 +468,31 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
     marginBottom: 16,
   },
   rescanButton: {
-    backgroundColor: "#1E40AF",
+    backgroundColor: colors.accent,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 0,
   },
   rescanText: {
-    color: "#fff",
+    color: colors.onAccent,
     fontWeight: "bold",
   },
   cancelButton: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     paddingVertical: 16,
     marginHorizontal: 16,
     marginBottom: 32,
-    borderRadius: 12,
+    borderRadius: 0,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: colors.border,
   },
   cancelText: {
-    color: "#666",
+    color: colors.muted,
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -494,12 +504,12 @@ const styles = StyleSheet.create({
   connectingTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: colors.text,
     marginBottom: 8,
   },
   connectingText: {
     fontSize: 16,
-    color: "#666",
+    color: colors.muted,
   },
   successIcon: {
     fontSize: 80,
@@ -513,13 +523,15 @@ const styles = StyleSheet.create({
   },
   successText: {
     fontSize: 16,
-    color: "#555",
+    color: colors.text,
     marginBottom: 12,
   },
   successSubtext: {
     fontSize: 14,
-    color: "#999",
+    color: colors.muted,
     textAlign: "center",
     paddingHorizontal: 20,
   },
 });
+
+
