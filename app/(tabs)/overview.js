@@ -8,10 +8,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  ProgressBarAndroid,
-  ProgressViewIOS,
-  Platform,
 } from "react-native";
+import * as Location from "expo-location";
+import Constants from "expo-constants";
 import { useRouter, useFocusEffect } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import api from "../services/api";
@@ -26,15 +25,18 @@ export default function OverviewScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const [latestReport, setLatestReport] = useState(null);
+  const [recentReports, setRecentReports] = useState([]);
   const [progress, setProgress] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
-  const [isBleConnected, setIsBleConnected] = useState(false);
+  const [isBleConnected, setIsBleConnected] = useState(true);
   const [bleDeviceName, setBleDeviceName] = useState("");
+  const [nearbyFuelPump, setNearbyFuelPump] = useState(null);
+  const [fuelPumpLoading, setFuelPumpLoading] = useState(true);
   const csvRecordCount = useMemo(() => getHardcodedSeedCsvRecordCount(), []);
-  const recordsRequired = progress?.recordsRequired || 100;
+  const recordsRequired = progress?.recordsRequired || 300;
   const displayCollectedRecords = csvRecordCount;
   const displayProgressPercent = Math.min(
     100,
@@ -56,22 +58,21 @@ export default function OverviewScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    loadNearbyFuelPump();
+  }, []);
+
   const loadData = async () => {
     try {
       const bleConnectedRaw = await AsyncStorage.getItem("connectedObdDevice");
       if (!bleConnectedRaw) {
         setIsBleConnected(false);
         setBleDeviceName("");
-        setSelectedVehicleId(null);
-        setLatestReport(null);
-        setProgress(null);
-        setIsLoading(false);
-        return;
+      } else {
+        const bleConnected = JSON.parse(bleConnectedRaw);
+        setIsBleConnected(true);
+        setBleDeviceName(bleConnected?.name || "OBD Device");
       }
-
-      const bleConnected = JSON.parse(bleConnectedRaw);
-      setIsBleConnected(true);
-      setBleDeviceName(bleConnected?.name || "OBD Device");
 
       // Get first vehicle
       const vehiclesResponse = await api.getVehicles();
@@ -99,6 +100,8 @@ export default function OverviewScreen() {
 
         const progressData = await api.getCollectionProgress(createdVehicleId);
         setProgress(progressData?.data || null);
+        const diagnostics = await api.getDiagnostics(createdVehicleId, { limit: 5 });
+        setRecentReports(diagnostics?.data || []);
         setLatestReport(null);
         setIsLoading(false);
         return;
@@ -112,10 +115,13 @@ export default function OverviewScreen() {
       const progressData = await api.getCollectionProgress(vehicleId);
       setProgress(progressData?.data || null);
 
+      const diagnostics = await api.getDiagnostics(vehicleId, { limit: 5 });
+      const diagnosticsList = diagnostics?.data || [];
+      setRecentReports(diagnosticsList);
+
       // Fetch latest diagnostic only if data is sufficient
       if (progressData?.data?.canGenerate) {
-        const diagnostic = await api.getLatestDiagnostic(vehicleId);
-        setLatestReport(diagnostic);
+        setLatestReport(diagnosticsList[0] || null);
       }
     } catch (error) {
       console.error("Load overview error:", error);
@@ -126,9 +132,238 @@ export default function OverviewScreen() {
     }
   };
 
+  const getFuelPumpDisplayAddress = (station, reverseGeo) => {
+    const addressParts = [
+      station?.street,
+      station?.city,
+      station?.state,
+      station?.postcode,
+    ].filter(Boolean);
+
+    if (addressParts.length > 0) {
+      return addressParts.slice(0, 2).join(", ");
+    }
+
+    const reverseParts = [
+      reverseGeo?.street || reverseGeo?.name,
+      reverseGeo?.city,
+      reverseGeo?.region,
+    ].filter(Boolean);
+
+    return reverseParts.slice(0, 2).join(", ") || "Address unavailable";
+  };
+
+  const getDistanceMeters = (fromLat, fromLon, toLat, toLon) => {
+    const toRad = (value) => (value * Math.PI) / 180;
+    const earthRadius = 6371000;
+    const dLat = toRad(toLat - fromLat);
+    const dLon = toRad(toLon - fromLon);
+    const lat1 = toRad(fromLat);
+    const lat2 = toRad(toLat);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadius * c;
+  };
+
+  const formatDistance = (meters) => {
+    if (!Number.isFinite(meters)) return "--";
+    if (meters < 1000) return `${Math.round(meters)} m`;
+    return `${(meters / 1000).toFixed(1)} km`;
+  };
+
+  const getNominatimShortAddress = (item) => {
+    const address = item?.address || {};
+    const line = [
+      address.road || address.suburb || address.neighbourhood,
+      address.city || address.town || address.village || address.state,
+    ].filter(Boolean);
+
+    if (line.length > 0) {
+      return line.join(", ");
+    }
+
+    return (item?.display_name || "Address unavailable").split(",").slice(0, 2).join(",");
+  };
+
+  const fuelPumpCacheKey = "nearbyFuelPumpCacheV1";
+  const googlePlacesApiKey =
+    Constants.expoConfig?.extra?.googlePlacesApiKey ||
+    process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ||
+    "";
+
+  const withTimeout = (promise, timeoutMs, timeoutMessage) => {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    });
+  };
+
+  const fetchNearbyGooglePlace = async ({
+    latitude,
+    longitude,
+    radius,
+    type,
+    keyword,
+    timeoutMessage,
+  }) => {
+    if (!googlePlacesApiKey) {
+      throw new Error("Google Places key missing");
+    }
+
+    const params = new URLSearchParams({
+      location: `${latitude},${longitude}`,
+      radius: String(radius),
+      type,
+      key: googlePlacesApiKey,
+    });
+
+    if (keyword) {
+      params.append("keyword", keyword);
+    }
+
+    const response = await withTimeout(
+      fetch(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?${params.toString()}`),
+      10000,
+      timeoutMessage,
+    );
+
+    if (!response.ok) {
+      throw new Error("Google Places request failed");
+    }
+
+    const payload = await response.json();
+    const status = payload?.status;
+    if (status && status !== "OK" && status !== "ZERO_RESULTS") {
+      throw new Error(payload?.error_message || `Google Places status: ${status}`);
+    }
+
+    const places = Array.isArray(payload?.results) ? payload.results : [];
+
+    return places
+      .map((place) => {
+        const placeLat = place?.geometry?.location?.lat;
+        const placeLon = place?.geometry?.location?.lng;
+        if (!Number.isFinite(placeLat) || !Number.isFinite(placeLon)) {
+          return null;
+        }
+
+        return {
+          id: place.place_id,
+          name: place.name || "Nearby place",
+          address: place.vicinity || place.formatted_address || "Address unavailable",
+          latitude: placeLat,
+          longitude: placeLon,
+          distance: getDistanceMeters(latitude, longitude, placeLat, placeLon),
+        };
+      })
+      .filter(Boolean)
+      .sort((first, second) => first.distance - second.distance);
+  };
+
+  const loadNearbyFuelPump = async () => {
+    setFuelPumpLoading(true);
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setNearbyFuelPump({
+          name: "Location permission needed",
+          address: "Enable location to find the nearest fuel pump",
+          distanceText: "--",
+          available: false,
+        });
+        return;
+      }
+
+      const lastKnownPosition = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60 * 1000,
+      });
+
+      const position =
+        lastKnownPosition ||
+        (await withTimeout(
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          8000,
+          "Location lookup timed out",
+        ));
+
+      const { latitude, longitude } = position.coords;
+      const stations = await fetchNearbyGooglePlace({
+        latitude,
+        longitude,
+        radius: 8000,
+        type: "gas_station",
+        timeoutMessage: "Fuel station lookup timed out",
+      });
+
+      const nearestStation = stations[0];
+      if (!nearestStation) {
+        const cachedFuelPump = await AsyncStorage.getItem(fuelPumpCacheKey);
+        if (cachedFuelPump) {
+          setNearbyFuelPump(JSON.parse(cachedFuelPump));
+          return;
+        }
+
+        setNearbyFuelPump({
+          name: "No fuel pump found nearby",
+          address: "Try again in a more populated area",
+          distanceText: "--",
+          available: false,
+        });
+        return;
+      }
+      const stationAddress = nearestStation.address || "Address unavailable";
+      setNearbyFuelPump({
+        name: nearestStation.name,
+        address: stationAddress,
+        distanceText: formatDistance(nearestStation.distance),
+        available: true,
+      });
+      await AsyncStorage.setItem(
+        fuelPumpCacheKey,
+        JSON.stringify({
+          name: nearestStation.name,
+          address: stationAddress,
+          distanceText: formatDistance(nearestStation.distance),
+          available: true,
+        }),
+      );
+    } catch (error) {
+      const cachedFuelPump = await AsyncStorage.getItem(fuelPumpCacheKey);
+      if (cachedFuelPump) {
+        setNearbyFuelPump(JSON.parse(cachedFuelPump));
+        return;
+      }
+
+      setNearbyFuelPump({
+        name: "Fuel pump unavailable",
+        address:
+          error?.message === "Google Places key missing"
+            ? "Set googlePlacesApiKey in app.json extra"
+            : "Unable to determine nearby station",
+        distanceText: "--",
+        available: false,
+      });
+    } finally {
+      setFuelPumpLoading(false);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
+    loadNearbyFuelPump();
   };
 
   const resolveVehicleId = async () => {
@@ -221,6 +456,32 @@ export default function OverviewScreen() {
     });
   };
 
+  const FuelPumpCard = () => (
+    <View style={styles.fuelPumpCard}>
+      <View style={styles.fuelPumpIconWrap}>
+        <MaterialCommunityIcons
+          name="gas-station"
+          size={22}
+          color={nearbyFuelPump?.available ? colors.accent : colors.muted}
+        />
+      </View>
+      <View style={styles.fuelPumpContent}>
+        <Text style={styles.fuelPumpTitle}>Nearby Fuel Pump</Text>
+        <Text style={styles.fuelPumpStationName} numberOfLines={1}>
+          {fuelPumpLoading ? "Finding nearest station..." : nearbyFuelPump?.name || "Fuel pump unavailable"}
+        </Text>
+        <Text style={styles.fuelPumpSubtitle} numberOfLines={1}>
+          {fuelPumpLoading ? "" : nearbyFuelPump?.address || "Address unavailable"}
+        </Text>
+      </View>
+      <View style={styles.fuelPumpStatusPill}>
+        <Text style={styles.fuelPumpStatusText}>
+          {fuelPumpLoading ? "Locating" : nearbyFuelPump?.distanceText || "--"}
+        </Text>
+      </View>
+    </View>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -230,17 +491,17 @@ export default function OverviewScreen() {
     );
   }
 
-  if (!isBleConnected) {
-    return (
-      <View style={styles.centerContainer}>
-        <MaterialCommunityIcons name="car-connected" size={72} color={colors.accent} style={styles.emptyIcon} />
-        <Text style={styles.emptyTitle}>No Vehicle Found</Text>
-        <Text style={styles.emptyText}>
-          Connect an OBD BLE device from the Live Data tab to continue.
-        </Text>
-      </View>
-    );
-  }
+  // if (!isBleConnected) {
+  //   return (
+  //     <View style={styles.centerContainer}>
+  //       <MaterialCommunityIcons name="car-connected" size={72} color={colors.accent} style={styles.emptyIcon} />
+  //       <Text style={styles.emptyTitle}>No Vehicle Found</Text>
+  //       <Text style={styles.emptyText}>
+  //         Connect an OBD BLE device from the Live Data tab to continue.
+  //       </Text>
+  //     </View>
+  //   );
+  // }
 
   // Show collecting data message if below threshold
   if (!progress?.canGenerate) {
@@ -264,10 +525,10 @@ export default function OverviewScreen() {
           <TouchableOpacity
             style={[
               styles.generateButton,
-              (isGenerating || !isBleConnected) && styles.generateButtonDisabled,
+              (isGenerating) && styles.generateButtonDisabled,
             ]}
             onPress={handleGenerateReport}
-            disabled={isGenerating || !isBleConnected}
+            disabled={isGenerating}
           >
             {isGenerating ? (
               <>
@@ -288,19 +549,14 @@ export default function OverviewScreen() {
               </Text>
             </View>
 
-            {Platform.OS === "ios" ? (
-              <ProgressViewIOS
-                style={styles.progressBar}
-                progress={displayProgressPercent / 100}
-                progressTintColor={colors.accent}
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${displayProgressPercent}%` },
+                ]}
               />
-            ) : (
-              <ProgressBarAndroid
-                style={styles.progressBar}
-                progress={displayProgressPercent / 100}
-                color={colors.accent}
-              />
-            )}
+            </View>
 
             <Text style={styles.progressMessage}>{displayProgressMessage}</Text>
           </View>
@@ -330,6 +586,32 @@ export default function OverviewScreen() {
             </View>
           </View>
 
+          <FuelPumpCard />
+
+          {recentReports.length > 0 && (
+            <View style={styles.recentReportsCard}>
+              <Text style={styles.cardTitle}>Recent Reports</Text>
+              {recentReports.map((report) => {
+                const reportScore = report.aiSnapshot?.healthScore ?? report.aiSnapshot?.confidenceScore ?? 0;
+                return (
+                  <View key={report._id} style={styles.recentReportItem}>
+                    <View style={styles.recentReportHeader}>
+                      <Text style={styles.recentReportTitle} numberOfLines={1}>
+                        {getHealthScoreLabel(reportScore)} Health
+                      </Text>
+                      <Text style={styles.recentReportTime}>
+                        {formatTime(report.createdAt)}
+                      </Text>
+                    </View>
+                    <Text style={styles.recentReportSummary} numberOfLines={2}>
+                      {report.aiSnapshot?.summary || report.aiSnapshot?.likely_issue || "No summary available"}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
         </View>
       </ScrollView>
     );
@@ -348,6 +630,7 @@ export default function OverviewScreen() {
         <Text style={styles.pageSubtitle}>{bleDeviceName || "OBD Device"}</Text>
       </View>
 
+
       {latestReport && (
         <>
           {(() => {
@@ -355,38 +638,38 @@ export default function OverviewScreen() {
             const confidenceScore = latestReport.aiSnapshot?.confidenceScore ?? 0;
             return (
               <>
-          {/* Health Score Card */}
-          <View style={styles.healthScoreCard}>
-            <Text style={styles.cardTitle}>Vehicle Health</Text>
-            <View style={styles.scoreCircle}>
-              <Text
-                style={[
-                  styles.scoreNumber,
-                  { color: getHealthScoreColor(healthScore) },
-                ]}
-              >
-                {healthScore || "N/A"}
-              </Text>
-              <Text style={styles.scoreLabel}>
-                {getHealthScoreLabel(healthScore)}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.healthBar,
-                {
-                  backgroundColor: getHealthScoreColor(
-                    healthScore
-                  ),
-                },
-                { width: `${healthScore || 0}%` },
-              ]}
-            />
-            <Text style={styles.confidenceSubtext}>
-              Report confidence: {confidenceScore}%
-            </Text>
-            <Text style={styles.healthUpdatedText}>Updated {formatTime(latestReport.createdAt)}</Text>
-          </View>
+                {/* Health Score Card */}
+                <View style={styles.healthScoreCard}>
+                  <Text style={styles.cardTitle}>Vehicle Health</Text>
+                  <View style={styles.scoreCircle}>
+                    <Text
+                      style={[
+                        styles.scoreNumber,
+                        { color: getHealthScoreColor(healthScore) },
+                      ]}
+                    >
+                      {healthScore || "N/A"}
+                    </Text>
+                    <Text style={styles.scoreLabel}>
+                      {getHealthScoreLabel(healthScore)}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.healthBar,
+                      {
+                        backgroundColor: getHealthScoreColor(
+                          healthScore
+                        ),
+                      },
+                      { width: `${healthScore || 0}%` },
+                    ]}
+                  />
+                  <Text style={styles.confidenceSubtext}>
+                    Report confidence: {confidenceScore}%
+                  </Text>
+                  <Text style={styles.healthUpdatedText}>Updated {formatTime(latestReport.createdAt)}</Text>
+                </View>
               </>
             );
           })()}
@@ -408,10 +691,10 @@ export default function OverviewScreen() {
           <TouchableOpacity
             style={[
               styles.generateButton,
-              (isGenerating || !isBleConnected) && styles.generateButtonDisabled,
+              isGenerating && styles.generateButtonDisabled,
             ]}
             onPress={handleGenerateReport}
-            disabled={isGenerating || !isBleConnected}
+            disabled={isGenerating}
           >
             {isGenerating ? (
               <>
@@ -476,6 +759,32 @@ export default function OverviewScreen() {
           </Text>
         </View>
       )}
+
+      <FuelPumpCard />
+
+      {recentReports.length > 0 && (
+        <View style={styles.recentReportsCard}>
+          <Text style={styles.cardTitle}>Recent Reports</Text>
+          {recentReports.map((report) => {
+            const reportScore = report.aiSnapshot?.healthScore ?? report.aiSnapshot?.confidenceScore ?? 0;
+            return (
+              <View key={report._id} style={styles.recentReportItem}>
+                <View style={styles.recentReportHeader}>
+                  <Text style={styles.recentReportTitle} numberOfLines={1}>
+                    {getHealthScoreLabel(reportScore)} Health
+                  </Text>
+                  <Text style={styles.recentReportTime}>
+                    {formatTime(report.createdAt)}
+                  </Text>
+                </View>
+                <Text style={styles.recentReportSummary} numberOfLines={2}>
+                  {report.aiSnapshot?.summary || report.aiSnapshot?.likely_issue || "No summary available"}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -503,6 +812,64 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.muted,
     letterSpacing: 0.4,
     textTransform: "uppercase",
+  },
+  fuelPumpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  fuelPumpIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.chipBg,
+    marginRight: 12,
+  },
+  fuelPumpContent: {
+    flex: 1,
+  },
+  fuelPumpTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: 0.2,
+  },
+  fuelPumpStationName: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.accent,
+  },
+  fuelPumpSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: colors.muted,
+  },
+  fuelPumpStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: colors.chipBg,
+    borderRadius: 999,
+  },
+  fuelPumpStatusText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.text,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   centerContainer: {
     flex: 1,
@@ -576,6 +943,17 @@ const createStyles = (colors) => StyleSheet.create({
     height: 8,
     marginVertical: 12,
     borderRadius: 0,
+  },
+  progressTrack: {
+    height: 10,
+    width: "100%",
+    marginVertical: 12,
+    backgroundColor: colors.border,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.accent,
   },
   progressMessage: {
     fontSize: 14,
@@ -807,6 +1185,47 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.text,
     lineHeight: 22,
   },
+  recentReportsCard: {
+    backgroundColor: colors.surface,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recentReportItem: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  recentReportHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+    gap: 12,
+  },
+  recentReportTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  recentReportTime: {
+    fontSize: 11,
+    color: colors.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  recentReportSummary: {
+    fontSize: 13,
+    color: colors.muted,
+    lineHeight: 18,
+  },
   fullReportButton: {
     backgroundColor: colors.surface,
     marginHorizontal: 16,
@@ -856,5 +1275,5 @@ const createStyles = (colors) => StyleSheet.create({
     letterSpacing: 0.4,
   },
 });
-  
+
 

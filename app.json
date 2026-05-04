@@ -39,6 +39,9 @@
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "googlePlacesApiKey": ""
+    }
   }
 }

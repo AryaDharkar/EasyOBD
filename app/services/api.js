@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Change this to your backend URL
-const API_BASE_URL = "http://192.168.0.61:3000/api/v1";
+const API_BASE_URL = "http://192.168.0.72:3000/api/v1";
 
 const getAuthToken = async () => {
   try {
@@ -29,12 +29,43 @@ const apiRequest = async (endpoint, options = {}) => {
     headers,
   };
 
+  const parseResponseBody = async (response) => {
+    const contentType = response.headers.get("content-type") || "";
+    const rawBody = await response.text();
+
+    if (!rawBody) {
+      return null;
+    }
+
+    if (contentType.includes("application/json")) {
+      return JSON.parse(rawBody);
+    }
+
+    const trimmedBody = rawBody.trim();
+    if (trimmedBody.startsWith("{")) {
+      return JSON.parse(trimmedBody);
+    }
+
+    if (trimmedBody.startsWith("<")) {
+      throw new Error(
+        `Unexpected HTML response from ${endpoint} (status ${response.status})`,
+      );
+    }
+
+    return trimmedBody;
+  };
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
+    const data = await parseResponseBody(response);
 
     if (!response.ok) {
-      throw new Error(data.message || "Something went wrong");
+      const message =
+        (data && typeof data === "object" && data.message) ||
+        (typeof data === "string" && data.length > 0
+          ? data.slice(0, 200)
+          : "Something went wrong");
+      throw new Error(message);
     }
 
     return data;

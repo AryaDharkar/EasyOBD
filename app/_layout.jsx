@@ -1,17 +1,16 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
 import { View, ActivityIndicator, Text, TextInput } from "react-native";
-import { useFonts } from "expo-font";
-import {
-  Orbitron_400Regular,
-  Orbitron_600SemiBold,
-} from "@expo-google-fonts/orbitron";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 
-const APP_FONT_REGULAR = "Orbitron_400Regular";
-const APP_FONT_EMPHASIS = "Orbitron_600SemiBold";
+const APP_FONT_FAMILY = "Inter";
+
+if (!Text.defaultProps) Text.defaultProps = {};
+Text.defaultProps.style = { fontFamily: APP_FONT_FAMILY };
+
+if (!TextInput.defaultProps) TextInput.defaultProps = {};
+TextInput.defaultProps.style = { fontFamily: APP_FONT_FAMILY };
 
 export default function RootLayout() {
   return (
@@ -26,28 +25,7 @@ export default function RootLayout() {
 function RootLayoutContent() {
   const { isThemeReady, colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [fontsLoaded] = useFonts({
-    Orbitron_400Regular,
-    Orbitron_600SemiBold,
-  });
-
-  useEffect(() => {
-    if (!fontsLoaded) return;
-
-    if (!Text.defaultProps) Text.defaultProps = {};
-    Text.defaultProps.style = [
-      Text.defaultProps.style,
-      { fontFamily: APP_FONT_EMPHASIS },
-    ];
-
-    if (!TextInput.defaultProps) TextInput.defaultProps = {};
-    TextInput.defaultProps.style = [
-      TextInput.defaultProps.style,
-      { fontFamily: APP_FONT_REGULAR },
-    ];
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded || !isThemeReady) {
+  if (!isThemeReady) {
     return (
       <View
         style={{

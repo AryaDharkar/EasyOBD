@@ -101,3 +101,7 @@ export const useTheme = () => {
   }
   return context;
 };
+
+export default function ThemeContextRoute() {
+  return null;
+}
